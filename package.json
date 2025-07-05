@@ -1,8 +1,12 @@
 {
   "name": "nfc.js",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "license": "MIT",
   "author": "Alex Syvolap",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexsyvolap/nfc.js"
+  },
   "description": "Web NFC manager – simple helper for reading/writing/locking NFC tags in the browser.",
   "keywords": [
     "nfc",
