@@ -34,6 +34,8 @@ Or via CDN:
 ## Quick Start
 
 ```js
+import { NfcManager } from 'nfc.js';
+
 const nfc = new NfcManager();
 ```
 
@@ -137,7 +139,7 @@ nfc.abort();
 
 ## Full List of Events
 
-| Envet           | Description                                   | Argument         |
+| Event           | Description                                   | Argument         |
 |-----------------|-----------------------------------------------|------------------|
 | scanStarted     | Fired when scanning is started                | -                |
 | readSuccess     | Fired when a tag is successfully read         | NDEFReadingEvent |
