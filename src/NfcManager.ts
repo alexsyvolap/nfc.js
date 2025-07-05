@@ -53,8 +53,7 @@ export class NfcManager extends EventEmitter {
       await this.reader.scan({ signal: this.abortController.signal });
 
       this.reader.onreading = (event: NDEFReadingEvent) => {
-        this.emit('reading', event);
-        this.emit('readSuccess', 'Tag read successfully');
+        this.emit('readSuccess', event);
         this.abort();
       };
 
@@ -66,6 +65,8 @@ export class NfcManager extends EventEmitter {
         this.abort();
         this.emit('timeout');
       }, scanTimeoutMs);
+
+      this.emit('scanStarted');
     } catch (err: unknown) {
       this.emit('error', this.normalizeError(err));
     }

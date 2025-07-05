@@ -41,7 +41,7 @@ const nfc = new NfcManager();
 
 ```js
 // Listen for the reading event
-nfc.on('reading', (event: NDEFReadingEvent) => {
+nfc.on('readSuccess', (event: NDEFReadingEvent) => {
     console.log('Tag read:', event);
 
     // Example: iterate through records on the tag
@@ -49,6 +49,11 @@ nfc.on('reading', (event: NDEFReadingEvent) => {
         console.log('Record type:', record.recordType);
         // Process record content depending on the type
     });
+});
+
+// Listen for start scanning
+nfc.on('scanStarted', () => {
+    console.log('Scan started');
 });
 
 // Listen for errors during reading
@@ -107,7 +112,7 @@ nfc.makeReadOnly().catch((err) => {
 ## Decode record (NDEFRecord) data
 
 ```js
-nfc.on('reading', (event: NDEFReadingEvent) => {
+nfc.on('readSuccess', (event: NDEFReadingEvent) => {
     const records = event.message.records;
 
     for (const record of records) {
@@ -132,15 +137,15 @@ nfc.abort();
 
 ## Full List of Events
 
-| Envet           | Description                                    | Argument         |
-|-----------------|------------------------------------------------|------------------|
-| reading         | Fired when a tag is successfully read          | NDEFReadingEvent |
-| readSuccess     | Reading operation succeeded (optional message) | string (message) |
-| writeSuccess    | Writing operation succeeded                    | -                |
-| readOnlySuccess | Tag has been locked as read-only               | -                |
-| error           | Fired on any error during scanning or writing  | Error            |
-| timeout         | Fired when scanning times out                  | -                |
-| abort           | Fired when operation is aborted                | -                |
+| Envet           | Description                                   | Argument         |
+|-----------------|-----------------------------------------------|------------------|
+| scanStarted     | Fired when scanning is started                | -                |
+| readSuccess     | Fired when a tag is successfully read         | NDEFReadingEvent |
+| writeSuccess    | Fired when writing operation succeeded        | -                |
+| readOnlySuccess | Fired when tag has been locked as read-only   | -                |
+| error           | Fired on any error during scanning or writing | Error            |
+| timeout         | Fired when scanning times out                 | -                |
+| abort           | Fired when operation is aborted               | -                |
 
 ## TODO
 

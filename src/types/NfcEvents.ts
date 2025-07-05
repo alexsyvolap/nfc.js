@@ -1,11 +1,11 @@
 import { NDEFReadingEvent } from './NDEF';
 
 export type NfcEvents = {
-  reading: (event: NDEFReadingEvent) => void;
+  scanStarted: () => void;
   error: (error: Error) => void;
   abort: () => void;
   timeout: () => void;
   writeSuccess: () => void;
-  readSuccess: (message: string) => void;
+  readSuccess: (event: NDEFReadingEvent) => void;
   readOnlySuccess: () => void;
 };
