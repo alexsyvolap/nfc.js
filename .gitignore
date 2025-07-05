@@ -1,0 +1,28 @@
+# Node modules
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Optional npm cache directory
+.npm/
+
+# dotenv environment variables file
+.env
+.env.local
+.env.*.local
+
+# IDE/editor specific
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# MacOS files
+.DS_Store
+
+# Misc
+*.tgz

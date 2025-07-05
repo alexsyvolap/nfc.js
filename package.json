@@ -1,0 +1,38 @@
+{
+  "name": "nfc.js",
+  "version": "0.0.3",
+  "license": "MIT",
+  "author": "Alex Syvolap",
+  "description": "Web NFC manager – simple helper for reading/writing/locking NFC tags in the browser.",
+  "keywords": [
+    "nfc",
+    "webnfc",
+    "nfc.js",
+    "nfc-manager",
+    "browser",
+    "tags",
+    "write",
+    "read",
+    "typescript"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepare": "npm run build",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
+  },
+  "devDependencies": {
+    "@types/events": "^3.0.3",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "events": "^3.3.0"
+  }
+}
