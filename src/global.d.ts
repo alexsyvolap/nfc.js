@@ -1,22 +1,4 @@
-import { NfcManagerRecordType } from './types';
-
-interface NDEFReadingEvent extends Event {
-  message: NDEFMessage;
-  serialNumber: string;
-}
-
-interface NDEFMessage {
-  records: NDEFRecord[];
-}
-
-interface NDEFRecord {
-  recordType: string | NfcManagerRecordType;
-  mediaType?: string | null;
-  id?: string | null;
-  data?: string | DataView;
-  encoding?: string | null;
-  lang?: string | null;
-}
+import { NDEFMessage, NDEFReadingEvent } from './types';
 
 declare class NDEFReader {
   constructor();
@@ -29,4 +11,10 @@ declare class NDEFReader {
 
   onreading: ((event: NDEFReadingEvent) => void) | null;
   onreadingerror: ((event: Event) => void) | null;
+}
+
+declare global {
+  interface Window {
+    NDEFReader: typeof NDEFReader;
+  }
 }

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { isNDEFReaderSupported } from './helpers';
-import { NfcEvents } from './types';
-import { NDEFMessage, NDEFReader, NDEFReadingEvent } from './global';
+import { NDEFMessage, NDEFReadingEvent, NfcEvents } from './types';
+import type { NDEFReader } from './global';
 
 export class NfcManager extends EventEmitter {
   private abortController: AbortController | null = null;
@@ -41,7 +41,7 @@ export class NfcManager extends EventEmitter {
     }
 
     this.abortController = new AbortController();
-    this.reader = new NDEFReader();
+    this.reader = new window.NDEFReader();
 
     try {
       await this.reader.scan({ signal: this.abortController.signal });
@@ -97,7 +97,7 @@ export class NfcManager extends EventEmitter {
     if (!this.isScannerReady()) {
       return;
     }
-    if (!('makeReadOnly' in NDEFReader.prototype)) {
+    if (!('makeReadOnly' in window.NDEFReader.prototype)) {
       const error = new Error(
         'This browser does not support making tags read-only',
       );

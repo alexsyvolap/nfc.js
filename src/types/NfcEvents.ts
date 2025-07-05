@@ -1,4 +1,4 @@
-import { NDEFReadingEvent } from '../global';
+import { NDEFReadingEvent } from './NDEF';
 
 export type NfcEvents = {
   reading: (event: NDEFReadingEvent) => void;
