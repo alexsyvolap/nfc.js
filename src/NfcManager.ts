@@ -1,6 +1,12 @@
 import { EventEmitter } from 'events';
 import { isNDEFReaderSupported } from './helpers';
-import { NDEFMessage, NDEFReadingEvent, NfcEvents } from './types';
+import {
+  NDEFMessage,
+  NDEFReadingEvent,
+  NDEFRecord,
+  NfcEvents,
+  NfcManagerRecordType,
+} from './types';
 import type { NDEFReader } from './global';
 
 export class NfcManager extends EventEmitter {
@@ -112,6 +118,38 @@ export class NfcManager extends EventEmitter {
       this.emit('readOnlySuccess');
     } catch (err: unknown) {
       this.emit('error', this.normalizeError(err));
+    }
+  }
+
+  /**
+   * Decodes a single NDEF record based on its recordType.
+   * Supports all NfcManagerRecordType values.
+   */
+  public decodeRecordData(record: NDEFRecord): string {
+    if (!record.data) {
+      throw new Error('Record has no data');
+    }
+
+    const encoding = record.encoding || 'utf-8';
+    const decoder = new TextDecoder(encoding);
+
+    switch (record.recordType) {
+      case NfcManagerRecordType.Text:
+      case NfcManagerRecordType.Mime:
+      case NfcManagerRecordType.SmartPoster:
+      case NfcManagerRecordType.AbsoluteUrl:
+      case NfcManagerRecordType.Url:
+        if (record.data instanceof DataView) {
+          return decoder.decode(record.data);
+        }
+        return record.data;
+
+      case NfcManagerRecordType.Unknown:
+      case NfcManagerRecordType.Empty:
+        return '';
+
+      default:
+        throw new Error(`Unsupported record type: ${record.recordType}`);
     }
   }
 

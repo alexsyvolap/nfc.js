@@ -104,6 +104,25 @@ nfc.makeReadOnly().catch((err) => {
 });
 ```
 
+## Decode record (NDEFRecord) data
+
+```js
+nfc.on('reading', (event: NDEFReadingEvent) => {
+    const records = event.message.records;
+
+    for (const record of records) {
+        try {
+            const decoded = nfc.decodeRecordData(record);
+            console.log('Decoded data:', decoded);
+        } catch (err) {
+            console.warn('Failed to decode record:', err);
+        }
+    }
+});
+
+await nfc.scan();
+```
+
 ## Aborting the Current Operation
 
 ```js
