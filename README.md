@@ -1,6 +1,6 @@
 # nfc.js
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/alexsyvolap/nfc.js/blob/main/LICENSE.md)
 
 A lightweight JavaScript (TypeScript-ready) helper for working
 with [Web NFC](https://developer.mozilla.org/en-US/docs/Web/API/Web_NFC_API) in modern browsers.
