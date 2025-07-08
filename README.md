@@ -51,6 +51,8 @@ nfc.on('readSuccess', (event: NDEFReadingEvent) => {
         console.log('Record type:', record.recordType);
         // Process record content depending on the type
     });
+    
+    nfc.abort();
 });
 
 // Listen for start scanning
@@ -94,9 +96,15 @@ nfc.on('writeSuccess', () => {
     console.log('Data successfully written to NFC tag');
 });
 
-nfc.write(message).catch((err) => {
-    console.error('Write failed:', err.message);
-});
+nfc.once(
+    'readSuccess',
+    async () => {
+        await nfc.write(message);
+        nfc.abort();
+    },
+);
+
+await nfc.scan();
 ```
 
 ## Making Tag Read-Only
@@ -106,9 +114,15 @@ nfc.on('readOnlySuccess', () => {
     console.log('Tag is now read-only');
 });
 
-nfc.makeReadOnly().catch((err) => {
-    console.error('Failed to make tag read-only:', err.message);
-});
+nfc.once(
+    'readSuccess',
+    async () => {
+        await nfc.makeReadOnly();
+        nfc.abort();
+    },
+);
+
+await nfc.scan();
 ```
 
 ## Decode record (NDEFRecord) data
