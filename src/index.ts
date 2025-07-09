@@ -1,10 +1,16 @@
 export { NfcManager } from './NfcManager';
-export { isNDEFReaderSupported } from './helpers';
+export {
+  isNDEFReaderSupported,
+  isSupported,
+  checkNfcPermission,
+} from './helpers';
 
 export type {
   NfcManagerRecordType,
-  NfcEvents,
   NDEFMessage,
   NDEFReadingEvent,
   NDEFRecord,
+  NfcManagerOptions,
+  NfcError,
+  NfcException,
 } from './types';

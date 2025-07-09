@@ -1,7 +1,7 @@
 import { NfcManagerRecordType } from '../NfcManagerRecordType';
 
 export interface NDEFRecord {
-  recordType: string | NfcManagerRecordType;
+  recordType: NfcManagerRecordType;
   mediaType?: string | null;
   id?: string | null;
   data?: string | DataView;

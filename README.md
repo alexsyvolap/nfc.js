@@ -41,107 +41,156 @@ const nfc = new NfcManager();
 
 ## Scanning NFC Tags
 
+### Basic Scan
+
 ```js
-// Listen for the reading event
-nfc.on('readSuccess', (event: NDEFReadingEvent) => {
-    console.log('Tag read:', event);
+try {
+  const event = await nfc.scan(20_000); // optional timeout in milliseconds
+  console.log('Tag read:', event);
 
-    // Example: iterate through records on the tag
-    event.message.records.forEach(record => {
-        console.log('Record type:', record.recordType);
-        // Process record content depending on the type
-    });
-    
-    nfc.abort();
-});
+  // Process records
+  event.message.records.forEach(record => {
+    console.log('Record type:', record.recordType);
+    const decoded = nfc.decodeRecordData(record);
+    console.log('Decoded data:', decoded);
+  });
+} catch (error) {
+  console.error('NFC error:', error.message);
+}
+```
 
-// Listen for start scanning
-nfc.on('scanStarted', () => {
-    console.log('Scan started');
-});
+### Scan with Processing
 
-// Listen for errors during reading
-nfc.on('error', (error) => {
-    console.error('NFC error:', error.message);
-});
+```js
+const result = await nfc.scanAndRead(async (event) => {
+  console.log('Tag detected:', event.serialNumber);
 
-// Listen for scan timeout
-nfc.on('timeout', () => {
-    console.warn('NFC scan timed out');
-});
+  // Process the tag
+  return event.message.records.map(record => {
+    return nfc.decodeRecordData(record);
+  });
+}, 20_000);
 
-// Listen for scan abort
-nfc.on('abort', () => {
-    console.log('NFC scan aborted');
-});
+console.log('Processed data:', result);
+```
 
-// Start scanning
-nfc.scan(20000); // optional scan timeout in milliseconds
+### Scan Multiple Tags
+
+```js
+try {
+  for await (const event of nfc.scanMultiple(30_000)) {
+    console.log('New tag:', event.serialNumber);
+
+    // Process each tag
+    const records = event.message.records;
+    // ... handle records
+
+    // Continue scanning for next tag
+  }
+} catch (error) {
+  console.error('Scan error:', error);
+}
 ```
 
 ## Writing Data to NFC Tag
 
+### Write
+
 ```js
+import { NfcManagerRecordType } from 'nfc.js';
+
 const message: NDEFMessage = {
-    records: [
-        {
-            recordType: NfcManagerRecordType.Text,
-            data: 'Hello NFC!',
-            lang: 'en',
-        },
-    ],
+  records: [
+    {
+      recordType: NfcManagerRecordType.Text,
+      data: 'Hello NFC!',
+      lang: 'en',
+    },
+  ],
 };
 
-nfc.on('writeSuccess', () => {
-    console.log('Data successfully written to NFC tag');
-});
+try {
+  await nfc.scanAndWrite(message, 20_000);
+  console.log('Data successfully written to NFC tag');
+} catch (error) {
+  console.error('Write error:', error.message);
+}
+```
 
-nfc.once(
-    'readSuccess',
-    async () => {
-        await nfc.write(message);
-        nfc.abort();
+### Manual Write Process
+
+```js
+import { NfcManagerRecordType } from 'nfc.js';
+
+const message: NDEFMessage = {
+  records: [
+    {
+      recordType: NfcManagerRecordType.Text,
+      data: 'Hello NFC!',
+      lang: 'en',
     },
-);
+  ],
+};
 
-await nfc.scan();
+try {
+  // Start scanning
+  const event = await nfc.scan(20_000);
+  console.log('Tag detected, writing data...');
+
+  // Write to the detected tag
+  await nfc.write(message);
+  console.log('Write successful');
+
+  // Stop scanning
+  nfc.abort();
+} catch (error) {
+  console.error('Write process error:', error);
+}
 ```
 
 ## Making Tag Read-Only
 
 ```js
-nfc.on('readOnlySuccess', () => {
-    console.log('Tag is now read-only');
-});
+try {
+  // Start scanning
+  const event = await nfc.scan(20_000);
+  console.log('Tag detected, making read-only...');
 
-nfc.once(
-    'readSuccess',
-    async () => {
-        await nfc.makeReadOnly();
-        nfc.abort();
-    },
-);
+  // Make tag read-only
+  await nfc.makeReadOnly();
+  console.log('Tag is now read-only');
 
-await nfc.scan();
+  // Stop scanning
+  nfc.abort();
+} catch (error) {
+  console.error('Read-only process error:', error);
+}
 ```
 
 ## Decode record (NDEFRecord) data
 
 ```js
-nfc.on('readSuccess', (event: NDEFReadingEvent) => {
-    const records = event.message.records;
+try {
+  // Start scanning
+  const event = await nfc.scan(20_000);
+  console.log('Tag detected, decoding data...');
 
-    for (const record of records) {
-        try {
-            const decoded = nfc.decodeRecordData(record);
-            console.log('Decoded data:', decoded);
-        } catch (err) {
-            console.warn('Failed to decode record:', err);
-        }
+  const records = event.message.records;
+
+  for (const record of records) {
+    try {
+      const decoded = nfc.decodeRecordData(record);
+      console.log('Decoded data:', decoded);
+    } catch (err) {
+      console.warn('Failed to decode record:', err);
     }
-});
+  }
 
-await nfc.scan();
+  // Stop scanning
+  nfc.abort();
+} catch (error) {
+  console.error('Decode process error:', error);
+}
 ```
 
 ## Aborting the Current Operation
@@ -151,17 +200,19 @@ await nfc.scan();
 nfc.abort();
 ```
 
-## Full List of Events
+## API Methods
 
-| Event           | Description                                   | Argument         |
-|-----------------|-----------------------------------------------|------------------|
-| scanStarted     | Fired when scanning is started                | -                |
-| readSuccess     | Fired when a tag is successfully read         | NDEFReadingEvent |
-| writeSuccess    | Fired when writing operation succeeded        | -                |
-| readOnlySuccess | Fired when tag has been locked as read-only   | -                |
-| error           | Fired on any error during scanning or writing | Error            |
-| timeout         | Fired when scanning times out                 | -                |
-| abort           | Fired when operation is aborted               | -                |
+| Method             | Description                                      | Returns                          |
+|--------------------|--------------------------------------------------|----------------------------------|
+| scan()             | Scans for a single NFC tag                       | Promise<NDEFReadingEvent>        |
+| scanAndWrite()     | Scans for a tag and writes data to it            | Promise<void>                    |
+| scanAndRead()      | Scans for a tag and processes it with a function | Promise<T>                       |
+| scanMultiple()     | Scans for multiple tags in sequence              | AsyncGenerator<NDEFReadingEvent> |
+| write()            | Writes data to an already detected tag           | Promise<void>                    |
+| makeReadOnly()     | Makes an already detected tag read-only          | Promise<void>                    |
+| decodeRecordData() | Decodes NDEF record data to string               | string                           |
+| abort()            | Aborts the current operation                     | void                             |
+| isScanning()       | Returns whether scanning is active               | boolean                          |
 
 ## TODO
 

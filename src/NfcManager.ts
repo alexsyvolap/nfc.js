@@ -1,45 +1,40 @@
-import { EventEmitter } from 'events';
-import { isNDEFReaderSupported } from './helpers';
+import { createNfcError, isNDEFReaderSupported } from './helpers';
 import {
   NDEFMessage,
   NDEFReadingEvent,
   NDEFRecord,
-  NfcEvents,
+  NfcError,
+  NfcException,
+  NfcManagerOptions,
   NfcManagerRecordType,
 } from './types';
 import type { NDEFReader } from './global';
 
-export class NfcManager extends EventEmitter {
+export class NfcManager {
   private abortController: AbortController | null = null;
   private reader: NDEFReader | null = null;
   private scanTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private options: Required<NfcManagerOptions>;
 
-  public on<K extends keyof NfcEvents>(event: K, listener: NfcEvents[K]): this {
-    return super.on(event, listener);
-  }
-
-  public once<K extends keyof NfcEvents>(
-    event: K,
-    listener: NfcEvents[K],
-  ): this {
-    return super.once(event, listener);
-  }
-
-  public off<K extends keyof NfcEvents>(
-    event: K,
-    listener: NfcEvents[K],
-  ): this {
-    return super.off(event, listener);
+  constructor(options: NfcManagerOptions = {}) {
+    this.options = {
+      defaultTimeout: 30_000,
+      onError: () => {},
+      onTagDetected: () => {},
+      ...options,
+    };
   }
 
   /**
-   * Starts scanning for NFC tags and resolves with the first reading event.
-   * Rejects on timeout or read error.
+   * Starts scanning for NFC tags
    */
-  public async scan(scanTimeoutMs = 30000): Promise<void> {
+  public async scan(timeoutMs?: number): Promise<NDEFReadingEvent> {
+    const timeout = timeoutMs ?? this.options.defaultTimeout;
+
     if (!isNDEFReaderSupported()) {
-      this.emit('error', new Error('NDEFReader not supported'));
-      return;
+      const error = createNfcError.notSupported();
+      this.options.onError(error);
+      throw error;
     }
 
     if (this.isScanning()) {
@@ -49,39 +44,91 @@ export class NfcManager extends EventEmitter {
     this.abortController = new AbortController();
     this.reader = new window.NDEFReader();
 
-    try {
-      await this.reader.scan({ signal: this.abortController.signal });
+    return new Promise<NDEFReadingEvent>((resolve, reject) => {
+      if (!this.reader || !this.abortController) {
+        const error = createNfcError.readerNotStarted();
+        this.options.onError(error);
+        reject(error);
+        return;
+      }
 
-      this.reader.onreading = (event: NDEFReadingEvent) =>
-        this.emit('readSuccess', event);
-
-      this.reader.onreadingerror = () => {
-        this.emit('error', new Error('Read error occurred'));
-        this.abort();
+      this.reader.onreading = (event: NDEFReadingEvent) => {
+        try {
+          this.options.onTagDetected(event.serialNumber);
+          resolve(event);
+        } catch (err) {
+          const error = this.normalizeError(err);
+          this.options.onError(error);
+          reject(error);
+        }
       };
 
-      this.scanTimeoutId = setTimeout(() => {
+      this.reader.onreadingerror = () => {
+        const error = createNfcError.invalidTarget();
+        this.options.onError(error);
         this.abort();
-        this.emit('timeout');
-      }, scanTimeoutMs);
+        reject(error);
+      };
 
-      this.emit('scanStarted');
-    } catch (err: unknown) {
-      this.emit('error', this.normalizeError(err));
-    }
+      // Setup timeout
+      this.scanTimeoutId = setTimeout(() => {
+        const error = createNfcError.timeout();
+        this.options.onError(error);
+        this.abort();
+        reject(error);
+      }, timeout);
+
+      // Start scanning
+      this.reader!.scan({ signal: this.abortController.signal }).catch(
+        (err) => {
+          const error = this.normalizeError(err);
+          this.options.onError(error);
+          reject(error);
+        },
+      );
+    });
   }
 
   /**
-   * Writes data to NFC tag.
-   * Throws if scanner not ready or write fails.
+   * Waits for the next NFC tag in an active scan session
+   */
+  public waitForNext(timeoutMs?: number): Promise<NDEFReadingEvent> {
+    const timeout = timeoutMs ?? this.options.defaultTimeout;
+
+    return new Promise<NDEFReadingEvent>((resolve, reject) => {
+      if (!this.isScanning()) {
+        reject(createNfcError.readerNotStarted());
+        return;
+      }
+
+      const timer = setTimeout(() => {
+        reject(createNfcError.timeout());
+      }, timeout);
+
+      const originalHandler = this.reader!.onreading;
+
+      this.reader!.onreading = (event: NDEFReadingEvent) => {
+        clearTimeout(timer);
+        this.reader!.onreading = originalHandler;
+        this.options.onTagDetected(event.serialNumber);
+        resolve(event);
+      };
+    });
+  }
+
+  /**
+   * Writes data to NFC tag
    */
   public async write(data: NDEFMessage): Promise<void> {
     if (!this.isScannerReady()) {
-      return;
+      const error = createNfcError.readerNotStarted();
+      this.options.onError(error);
+      throw error;
     }
-    if (!data) {
-      const error = new Error('No data to write');
-      this.emit('error', error);
+
+    if (!data || !data.records || data.records.length === 0) {
+      const error = createNfcError.noData();
+      this.options.onError(error);
       throw error;
     }
 
@@ -89,25 +136,26 @@ export class NfcManager extends EventEmitter {
       await this.reader?.write(data, {
         signal: this.abortController?.signal,
       });
-      this.emit('writeSuccess');
-    } catch (err: unknown) {
-      this.emit('error', this.normalizeError(err));
+    } catch (err) {
+      const error = this.normalizeError(err);
+      this.options.onError(error);
+      throw error;
     }
   }
 
   /**
-   * Makes NFC tag read-only.
-   * Throws if scanner not ready or operation unsupported or fails.
+   * Makes NFC tag read-only
    */
   public async makeReadOnly(): Promise<void> {
     if (!this.isScannerReady()) {
-      return;
+      const error = createNfcError.readerNotStarted();
+      this.options.onError(error);
+      throw error;
     }
+
     if (!('makeReadOnly' in window.NDEFReader.prototype)) {
-      const error = new Error(
-        'This browser does not support making tags read-only',
-      );
-      this.emit('error', error);
+      const error = createNfcError.unsupportedOperation('makeReadOnly');
+      this.options.onError(error);
       throw error;
     }
 
@@ -115,19 +163,66 @@ export class NfcManager extends EventEmitter {
       await this.reader?.makeReadOnly({
         signal: this.abortController?.signal,
       });
-      this.emit('readOnlySuccess');
-    } catch (err: unknown) {
-      this.emit('error', this.normalizeError(err));
+    } catch (err) {
+      const error = this.normalizeError(err);
+      this.options.onError(error);
+      throw error;
     }
   }
 
   /**
-   * Decodes a single NDEF record based on its recordType.
-   * Supports all NfcManagerRecordType values.
+   * Convenient method for scan -> write -> abort workflow
+   */
+  public async scanAndWrite(
+    data: NDEFMessage,
+    timeoutMs?: number,
+  ): Promise<void> {
+    await this.scan(timeoutMs);
+    await this.write(data);
+    this.abort();
+  }
+
+  /**
+   * Convenient method for scan -> read -> process workflow
+   */
+  public async scanAndRead<T>(
+    processor: (event: NDEFReadingEvent) => T | Promise<T>,
+    timeoutMs?: number,
+  ): Promise<T> {
+    const event = await this.scan(timeoutMs);
+    const result = await processor(event);
+    this.abort();
+    return result;
+  }
+
+  /**
+   * Scans for multiple tags in sequence
+   */
+  public async *scanMultiple(
+    timeoutMs?: number,
+  ): AsyncGenerator<NDEFReadingEvent> {
+    const firstEvent = await this.scan(timeoutMs);
+    yield firstEvent;
+
+    while (this.isScanning()) {
+      try {
+        const event = await this.waitForNext(timeoutMs);
+        yield event;
+      } catch (error) {
+        if (error instanceof NfcException && error.code === NfcError.TIMEOUT) {
+          break;
+        }
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Decodes a single NDEF record
    */
   public decodeRecordData(record: NDEFRecord): string {
     if (!record.data) {
-      throw new Error('Record has no data');
+      throw createNfcError.noData();
     }
 
     const encoding = record.encoding || 'utf-8';
@@ -149,14 +244,14 @@ export class NfcManager extends EventEmitter {
         return '';
 
       default:
-        throw new Error(`Unsupported record type: ${record.recordType}`);
+        throw createNfcError.unsupportedRecordType(record.recordType);
     }
   }
 
   /**
-   * Aborts current scanning or writing operation.
+   * Aborts current operation
    */
-  public abort() {
+  public abort(): void {
     this.abortController?.abort();
     this.abortController = null;
 
@@ -170,33 +265,42 @@ export class NfcManager extends EventEmitter {
       clearTimeout(this.scanTimeoutId);
       this.scanTimeoutId = null;
     }
-
-    this.emit('abort');
   }
 
   /**
-   * Returns whether scanning is active.
+   * Returns whether scanning is active
    */
   public isScanning(): boolean {
     return this.abortController !== null;
   }
 
   private isScannerReady(): boolean {
-    if (!isNDEFReaderSupported()) {
-      this.emit('error', new Error('NDEFReader not supported'));
-      return false;
-    }
-    if (!this.reader) {
-      this.emit('error', new Error('Reader not started'));
-      return false;
-    }
-
-    return true;
+    return isNDEFReaderSupported() && this.reader !== null;
   }
 
-  private normalizeError(err: unknown): Error {
-    if (err instanceof Error) return err;
-    if (typeof err === 'string') return new Error(err);
-    return new Error('Unknown error');
+  private normalizeError(err: unknown): NfcException {
+    if (err instanceof NfcException) return err;
+    if (err instanceof Error) {
+      const errorMap: Record<string, () => NfcException> = {
+        NotSupportedError: () => createNfcError.notSupported(err),
+        SecurityError: () => createNfcError.permissionDenied(err),
+        InvalidTargetError: () => createNfcError.invalidTarget(err),
+        TimeoutError: () => createNfcError.timeout(err),
+        AbortError: () => createNfcError.abort(err),
+        SyntaxError: () => createNfcError.syntaxError(err),
+        NetworkError: () => createNfcError.networkError(err),
+      };
+
+      return (
+        errorMap[err.name]?.() ||
+        new NfcException(err.message, NfcError.NETWORK_ERROR, err)
+      );
+    }
+
+    if (typeof err === 'string') {
+      return new NfcException(err, NfcError.NETWORK_ERROR);
+    }
+
+    return new NfcException('Unknown error', NfcError.NETWORK_ERROR);
   }
 }
